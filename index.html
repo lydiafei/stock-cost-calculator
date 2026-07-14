@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="股票成本计算器">
+    <title>股票成本计算器</title>
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #007AFF;
+            --success-color: #34C759;
+            --danger-color: #FF3B30;
+            --warning-color: #FF9500;
+            --bg-color: #F2F2F7;
+            --card-bg: #FFFFFF;
+            --text-primary: #000000;
+            --text-secondary: #8E8E93;
+            --border-color: #C6C6C8;
+            --shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #000000;
+                --card-bg: #1C1C1E;
+                --text-primary: #FFFFFF;
+                --text-secondary: #8E8E93;
+                --border-color: #38383A;
+                --shadow: 0 2px 8px rgba(0,0,0,0.3);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.5;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        /* Header */
+        .header {
+            background: var(--card-bg);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            min-height: 36px;
+        }
+
+        .header-btn.secondary {
+            background: var(--text-secondary);
+        }
+
+        .header-btn.danger {
+            background: var(--danger-color);
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 50px;
+            z-index: 99;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            cursor: pointer;
+            min-height: 44px;
+        }
+
+        .tab-btn.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* Main Container */
+        .container {
+            padding: 16px;
+            display: none;
+        }
+
+        .container.active {
+            display: block;
+        }
+
+        /* Summary Card */
+        .summary-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+
+        .summary-row:not(:last-child) {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .summary-label {
+            color: var(--text-secondary);
+        }
+
+        .summary-value {
+            font-weight: 600;
+        }
+
+        .profit {
+            color: var(--success-color);
+        }
+
+        .loss {
+            color: var(--danger-color);
+        }
+
+        /* Stock Card */
+        .stock-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            min-height: 44px;
+        }
+
+        .stock-card:active {
+            opacity: 0.8;
+        }
+
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .stock-name {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .stock-code {
+            color: var(--text-secondary);
+            margin-left: 8px;
+        }
+
+        .stock-badge {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .stock-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stock-info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stock-info-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .stock-info-value {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .price-input {
+            width: 80px;
+            padding: 4px 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            text-align: right;
+        }
+
+        /* Form Styles */
+        .form-section {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .form-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 16px;
+            min-height: 44px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 50px;
+        }
+
+        .submit-btn:active {
+            opacity: 0.8;
+        }
+
+        .submit-btn:disabled {
+            background: var(--text-secondary);
+        }
+
+        /* Transaction List */
+        .transaction-list {
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            min-height: 44px;
+        }
+
+        .transaction-item:last-child {
+            border-bottom: none;
+        }
+
+        .transaction-info {
+            flex: 1;
+        }
+
+        .transaction-date {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .transaction-details {
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .transaction-type {
+            font-weight: 600;
+            margin-right: 8px;
+        }
+
+        .transaction-type.buy {
+            color: var(--primary-color);
+        }
+
+        .transaction-type.sell {
+            color: var(--warning-color);
+        }
+
+        .transaction-profit {
+            text-align: right;
+        }
+
+        .transaction-profit .profit,
+        .transaction-profit .loss {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--danger-color);
+            padding: 8px;
+            cursor: pointer;
+            margin-left: 8px;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            min-height: 44px;
+        }
+
+        .modal-btn.cancel {
+            background: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .modal-btn.confirm {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .modal-btn.danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        /* Period Selector */
+        .period-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .period-btn {
+            padding: 10px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            min-height: 44px;
+        }
+
+        .period-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        /* Report Table */
+        .report-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .report-table th,
+        .report-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .report-table th {
+            background: var(--bg-color);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .report-table td {
+            font-size: 14px;
+        }
+
+        .report-table .total-row {
+            font-weight: 600;
+            background: var(--bg-color);
+        }
+
+        /* Textarea for import/export */
+        .data-textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: monospace;
+            resize: vertical;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 2000;
+            display: none;
+        }
+
+        .toast.show {
+            display: block;
+            animation: fadeInOut 2s ease-in-out;
+        }
+
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            20%, 80% { opacity: 1; }
+        }
+
+        /* Action buttons in detail page */
+        .detail-actions {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .detail-actions .header-btn {
+            flex: 1;
+        }
+
+        /* History toggle */
+        .history-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .history-toggle label {
+            font-size: 14px;
+        }
+
+        /* SVG Icons */
+        .icon {
+            width: 20px;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1>股票成本计算器</h1>
+        <div class="header-actions">
+            <button class="header-btn" onclick="showReport()">报表</button>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+        <button class="tab-btn active" onclick="switchTab('portfolio')">持仓</button>
+        <button class="tab-btn" onclick="switchTab('history')">历史记录</button>
+        <button class="tab-btn" onclick="switchTab('add')">添加交易</button>
+    </div>
+
+    <!-- Portfolio Tab -->
+    <div id="portfolio-tab" class="container active">
+        <div id="portfolio-summary"></div>
+        <div id="portfolio-list"></div>
+        <div id="portfolio-empty" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">📊</div>
+            <div>暂无持仓</div>
+            <div style="margin-top: 8px; font-size: 13px;">点击"添加交易"按钮记录您的第一笔交易</div>
+        </div>
+    </div>
+
+    <!-- History Tab -->
+    <div id="history-tab" class="container">
+        <div class="history-toggle">
+            <input type="checkbox" id="show-empty-stocks" onchange="renderHistory()">
+            <label for="show-empty-stocks">显示持仓为0的股票</label>
+        </div>
+        <div id="history-list"></div>
+        <div id="history-empty" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">📁</div>
+            <div>暂无历史记录</div>
+        </div>
+    </div>
+
+    <!-- Add Transaction Tab -->
+    <div id="add-tab" class="container">
+        <div class="form-section">
+            <div class="form-title">添加交易记录</div>
+            <form id="trade-form" onsubmit="addTrade(event)">
+                <div class="form-group">
+                    <label>股票名称</label>
+                    <input type="text" id="stock-name" placeholder="例如：贵州茅台" required>
+                </div>
+                <div class="form-group">
+                    <label>股票代码</label>
+                    <input type="text" id="stock-code" placeholder="例如：600519" required pattern="[0-9]{6}" maxlength="6">
+                </div>
+                <div class="form-group">
+                    <label>交易方向</label>
+                    <select id="trade-type" required>
+                        <option value="buy">买入</option>
+                        <option value="sell">卖出</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>成交价格</label>
+                        <input type="number" id="trade-price" step="0.01" min="0.01" placeholder="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label>成交数量</label>
+                        <input type="number" id="trade-quantity" step="1" min="1" placeholder="0" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>交易日期</label>
+                    <input type="date" id="trade-date" required>
+                </div>
+                <button type="submit" class="submit-btn">添加交易</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div id="detail-modal" class="modal-overlay" onclick="closeDetailModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div id="detail-content"></div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div id="report-modal" class="modal-overlay" onclick="closeReportModal(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width: 500px;">
+            <div class="modal-title">交易报表</div>
+            <div class="period-selector">
+                <button class="period-btn" onclick="setReportPeriod('today')">今日</button>
+                <button class="period-btn" onclick="setReportPeriod('week')">本周</button>
+                <button class="period-btn active" onclick="setReportPeriod('month')">本月</button>
+                <button class="period-btn" onclick="setReportPeriod('all')">全部</button>
+            </div>
+            <div id="report-content"></div>
+            <div class="detail-actions" style="margin-top: 16px;">
+                <button class="header-btn" onclick="exportData()">导出数据</button>
+                <button class="header-btn secondary" onclick="showImportModal()">导入数据</button>
+            </div>
+            <button class="header-btn danger" style="width: 100%; margin-top: 12px;" onclick="clearAllData()">清空所有数据</button>
+        </div>
+    </div>
+
+    <!-- Import Modal -->
+    <div id="import-modal" class="modal-overlay" onclick="closeImportModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-title">导入数据</div>
+            <p style="margin-bottom: 12px; font-size: 13px; color: var(--text-secondary);">请粘贴之前导出的 JSON 数据：</p>
+            <textarea id="import-data" class="data-textarea" placeholder='{"stockTrades": [...], ...}'></textarea>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeImportModal()">取消</button>
+                <button class="modal-btn confirm" onclick="importData()">导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal-overlay" onclick="closeConfirmModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-title" id="confirm-title">确认操作</div>
+            <p id="confirm-message" style="margin-bottom: 16px;"></p>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeConfirmModal()">取消</button>
+                <button class="modal-btn danger" id="confirm-btn" onclick="confirmAction()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // ==================== Data Storage ====================
+        const STORAGE_KEYS = {
+            trades: 'stockTrades',
+            prices: 'stockPrices',
+            hidden: 'hiddenStocks'
+        };
+
+        function getTrades() {
+            const data = localStorage.getItem(STORAGE_KEYS.trades);
+            return data ? JSON.parse(data) : [];
+        }
+
+        function saveTrades(trades) {
+            localStorage.setItem(STORAGE_KEYS.trades, JSON.stringify(trades));
+        }
+
+        function getPrices() {
+            const data = localStorage.getItem(STORAGE_KEYS.prices);
+            return data ? JSON.parse(data) : {};
+        }
+
+        function savePrices(prices) {
+            localStorage.setItem(STORAGE_KEYS.prices, JSON.stringify(prices));
+        }
+
+        function getHiddenStocks() {
+            const data = localStorage.getItem(STORAGE_KEYS.hidden);
+            return data ? JSON.parse(data) : [];
+        }
+
+        function saveHiddenStocks(hidden) {
+            localStorage.setItem(STORAGE_KEYS.hidden, JSON.stringify(hidden));
+        }
+
+        // ==================== Core Calculation ====================
+        /**
+         * 计算持仓 - 移动加权平均法
+         * @returns {Object} 持仓字典，key 为股票代码
+         */
+        function calculatePositions() {
+            const trades = getTrades();
+            const positions = {};
+
+            // 按时间正序排序
+            trades.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            trades.forEach(trade => {
+                const code = trade.code;
+                if (!positions[code]) {
+                    positions[code] = {
+                        code: code,
+                        name: trade.name,
+                        totalQuantity: 0,
+                        totalCost: 0,
+                        averageCost: 0,
+                        realizedProfit: 0
+                    };
+                }
+
+                const pos = positions[code];
+
+                if (trade.type === 'buy') {
+                    // 买入：增加持仓，重新计算平均成本
+                    pos.totalCost += trade.price * trade.quantity;
+                    pos.totalQuantity += trade.quantity;
+                    pos.averageCost = pos.totalQuantity > 0 ? pos.totalCost / pos.totalQuantity : 0;
+                } else {
+                    // 卖出：计算盈亏
+                    const profit = (trade.price - pos.averageCost) * trade.quantity;
+                    pos.realizedProfit += profit;
+                    pos.totalQuantity -= trade.quantity;
+                    pos.totalCost = pos.averageCost * pos.totalQuantity;
+
+                    if (pos.totalQuantity <= 0) {
+                        pos.totalQuantity = 0;
+                        pos.totalCost = 0;
+                        pos.averageCost = 0;
+                    }
+                }
+            });
+
+            return positions;
+        }
+
+        /**
+         * 获取带有平均成本的交易列表（用于显示每笔盈亏）
+         */
+        function getTradesWithAverageCost(stockCode) {
+            const trades = getTrades().filter(t => t.code === stockCode);
+            // 按时间正序排序
+            trades.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            let totalQuantity = 0;
+            let totalCost = 0;
+            let averageCost = 0;
+
+            return trades.map(trade => {
+                const result = { ...trade, averageCost: averageCost };
+
+                if (trade.type === 'buy') {
+                    totalCost += trade.price * trade.quantity;
+                    totalQuantity += trade.quantity;
+                    averageCost = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+                } else {
+                    // 卖出时计算盈亏
+                    result.profit = (trade.price - averageCost) * trade.quantity;
+                    totalQuantity -= trade.quantity;
+                    totalCost = averageCost * totalQuantity;
+                    if (totalQuantity <= 0) {
+                        averageCost = 0;
+                    }
+                }
+
+                return result;
+            }).reverse(); // 按时间倒序返回
+        }
+
+        // ==================== UI Functions ====================
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 设置默认日期为今天
+            document.getElementById('trade-date').value = new Date().toISOString().split('T')[0];
+            renderPortfolio();
+        });
+
+        // Tab 切换
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+
+            if (tab === 'portfolio') {
+                document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+                document.getElementById('portfolio-tab').classList.add('active');
+                renderPortfolio();
+            } else if (tab === 'history') {
+                document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+                document.getElementById('history-tab').classList.add('active');
+                renderHistory();
+            } else if (tab === 'add') {
+                document.querySelector('.tab-btn:nth-child(3)').classList.add('active');
+                document.getElementById('add-tab').classList.add('active');
+            }
+        }
+
+        // 渲染持仓列表
+        function renderPortfolio() {
+            const positions = calculatePositions();
+            const prices = getPrices();
+            const hiddenStocks = getHiddenStocks();
+
+            // 获取仍有持仓且未隐藏的股票
+            const activeStocks = Object.values(positions).filter(pos =>
+                pos.totalQuantity > 0 && !hiddenStocks.includes(pos.code)
+            );
+
+            // 汇总数据
+            let totalMarketValue = 0;
+            let totalCost = 0;
+            let totalProfit = 0;
+
+            activeStocks.forEach(pos => {
+                const price = prices[pos.code] || 0;
+                const marketValue = price * pos.totalQuantity;
+                const cost = pos.averageCost * pos.totalQuantity;
+                totalMarketValue += marketValue;
+                totalCost += cost;
+                totalProfit += marketValue - cost;
+            });
+
+            const totalProfitPercent = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
+
+            // 渲染汇总
+            const summaryHtml = `
+                <div class="summary-card">
+                    <div class="summary-row">
+                        <span class="summary-label">总市值</span>
+                        <span class="summary-value">¥${formatNumber(totalMarketValue)}</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">持仓盈亏</span>
+                        <span class="summary-value ${totalProfit >= 0 ? 'profit' : 'loss'}">
+                            ¥${formatNumber(totalProfit)} (${totalProfitPercent >= 0 ? '+' : ''}${totalProfitPercent.toFixed(2)}%)
+                        </span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('portfolio-summary').innerHTML = summaryHtml;
+
+            // 渲染持仓列表
+            const listHtml = activeStocks.map(pos => {
+                const price = prices[pos.code] || 0;
+                const marketValue = price * pos.totalQuantity;
+                const cost = pos.averageCost * pos.totalQuantity;
+                const profit = marketValue - cost;
+                const profitPercent = cost > 0 ? (profit / cost) * 100 : 0;
+
+                return `
+                    <div class="stock-card" onclick="showStockDetail('${pos.code}')">
+                        <div class="stock-header">
+                            <span>
+                                <span class="stock-name">${pos.name}</span>
+                                <span class="stock-code">${pos.code}</span>
+                            </span>
+                        </div>
+                        <div class="stock-info">
+                            <div class="stock-info-item">
+                                <span class="stock-info-label">持仓数量</span>
+                                <span class="stock-info-value">${formatNumber(pos.totalQuantity)} 股</span>
+                            </div>
+                            <div class="stock-info-item">
+                                <span class="stock-info-label">平均成本</span>
+                                <span class="stock-info-value">¥${pos.averageCost.toFixed(2)}</span>
+                            </div>
+                            <div class="stock-info-item">
+                                <span class="stock-info-label">现价</span>
+                                <input type="number" class="price-input" value="${price}"
+                                    onchange="updatePrice('${pos.code}', this.value)"
+                                    onclick="event.stopPropagation()"
+                                    placeholder="输入现价">
+                            </div>
+                            <div class="stock-info-item">
+                                <span class="stock-info-label">市值</span>
+                                <span class="stock-info-value">¥${formatNumber(marketValue)}</span>
+                            </div>
+                            <div class="stock-info-item" style="grid-column: span 2;">
+                                <span class="stock-info-label">持仓盈亏</span>
+                                <span class="stock-info-value ${profit >= 0 ? 'profit' : 'loss'}">
+                                    ¥${formatNumber(profit)} (${profitPercent >= 0 ? '+' : ''}${profitPercent.toFixed(2)}%)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('portfolio-list').innerHTML = listHtml;
+            document.getElementById('portfolio-empty').style.display = activeStocks.length === 0 ? 'block' : 'none';
+        }
+
+        // 渲染历史记录
+        function renderHistory() {
+            const positions = calculatePositions();
+            const hiddenStocks = getHiddenStocks();
+            const showEmpty = document.getElementById('show-empty-stocks').checked;
+
+            // 获取已清仓或隐藏的股票
+            let historyStocks = Object.values(positions).filter(pos => {
+                if (hiddenStocks.includes(pos.code)) return true;
+                if (showEmpty && pos.totalQuantity === 0) return true;
+                return false;
+            });
+
+            // 计算累计已实现盈亏
+            historyStocks = historyStocks.map(pos => {
+                const trades = getTrades().filter(t => t.code === pos.code);
+                let realizedProfit = 0;
+                let tempAvgCost = 0;
+                let tempQty = 0;
+
+                trades.sort((a, b) => new Date(a.date) - new Date(b.date)).forEach(t => {
+                    if (t.type === 'buy') {
+                        tempQty += t.quantity;
+                        tempAvgCost = tempQty > 0 ? (tempAvgCost * (tempQty - t.quantity) + t.price * t.quantity) / tempQty : 0;
+                    } else {
+                        realizedProfit += (t.price - tempAvgCost) * t.quantity;
+                        tempQty -= t.quantity;
+                        tempAvgCost = tempQty > 0 ? tempAvgCost : 0;
+                    }
+                });
+
+                return { ...pos, realizedProfit };
+            });
+
+            const listHtml = historyStocks.map(pos => {
+                const isHidden = hiddenStocks.includes(pos.code);
+
+                return `
+                    <div class="stock-card" onclick="showStockDetail('${pos.code}')">
+                        <div class="stock-header">
+                            <span>
+                                <span class="stock-name">${pos.name}</span>
+                                <span class="stock-code">${pos.code}</span>
+                            </span>
+                            ${pos.totalQuantity === 0 ? '<span class="stock-badge">已清仓</span>' : ''}
+                        </div>
+                        <div class="stock-info">
+                            <div class="stock-info-item">
+                                <span class="stock-info-label">持仓数量</span>
+                                <span class="stock-info-value">${formatNumber(pos.totalQuantity)} 股</span>
+                            </div>
+                            <div class="stock-info-item">
+                                <span class="stock-info-label">已实现盈亏</span>
+                                <span class="stock-info-value ${pos.realizedProfit >= 0 ? 'profit' : 'loss'}">
+                                    ¥${formatNumber(pos.realizedProfit)}
+                                </span>
+                            </div>
+                        </div>
+                        ${isHidden ? `
+                            <div class="detail-actions" style="margin-top: 12px;">
+                                <button class="header-btn" onclick="event.stopPropagation(); restoreStock('${pos.code}')">恢复显示</button>
+                                <button class="header-btn danger" onclick="event.stopPropagation(); deleteStockCompletely('${pos.code}')">彻底删除</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('history-list').innerHTML = listHtml;
+            document.getElementById('history-empty').style.display = historyStocks.length === 0 ? 'block' : 'none';
+        }
+
+        // 添加交易
+        function addTrade(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('stock-name').value.trim();
+            const code = document.getElementById('stock-code').value.trim();
+            const type = document.getElementById('trade-type').value;
+            const price = parseFloat(document.getElementById('trade-price').value);
+            const quantity = parseInt(document.getElementById('trade-quantity').value);
+            const date = document.getElementById('trade-date').value;
+
+            if (!name || !code || !price || !quantity || !date) {
+                showToast('请填写所有必填项');
+                return;
+            }
+
+            // 卖出数量校验
+            if (type === 'sell') {
+                const positions = calculatePositions();
+                const pos = positions[code];
+                const currentQty = pos ? pos.totalQuantity : 0;
+
+                if (quantity > currentQty) {
+                    showToast(`卖出数量不能超过当前持仓数量 (${currentQty}股)`);
+                    return;
+                }
+            }
+
+            // 保存交易记录
+            const trades = getTrades();
+            trades.push({
+                id: Date.now(),
+                name: name,
+                code: code,
+                type: type,
+                price: price,
+                quantity: quantity,
+                date: date
+            });
+            saveTrades(trades);
+
+            // 如果是新股票，初始化现价
+            const prices = getPrices();
+            if (!prices[code]) {
+                prices[code] = price;
+                savePrices(prices);
+            }
+
+            // 重置表单
+            document.getElementById('trade-form').reset();
+            document.getElementById('trade-date').value = new Date().toISOString().split('T')[0];
+
+            showToast('交易记录已添加');
+            renderPortfolio();
+
+            // 切换到持仓页面
+            switchTab('portfolio');
+        }
+
+        // 更新现价
+        function updatePrice(code, price) {
+            const prices = getPrices();
+            prices[code] = parseFloat(price) || 0;
+            savePrices(prices);
+            renderPortfolio();
+        }
+
+        // 删除交易记录
+        function deleteTrade(id) {
+            showConfirm('确认删除', '确定要删除这条交易记录吗？', () => {
+                const trades = getTrades();
+                const index = trades.findIndex(t => t.id === id);
+                if (index !== -1) {
+                    trades.splice(index, 1);
+                    saveTrades(trades);
+
+                    // 检查是否需要隐藏
+                    const positions = calculatePositions();
+                    const code = trades[index] ? trades[index].code : '';
+                    if (code && positions[code] && positions[code].totalQuantity === 0) {
+                        const hidden = getHiddenStocks();
+                        if (!hidden.includes(code)) {
+                            hidden.push(code);
+                            saveHiddenStocks(hidden);
+                        }
+                    }
+
+                    renderPortfolio();
+                    showToast('交易记录已删除');
+                }
+            });
+        }
+
+        // 彻底删除股票
+        function deleteStockCompletely(code) {
+            showConfirm('彻底删除', `确定要删除 ${code} 的所有交易记录吗？此操作不可恢复！`, () => {
+                let trades = getTrades();
+                trades = trades.filter(t => t.code !== code);
+                saveTrades(trades);
+
+                const prices = getPrices();
+                delete prices[code];
+                savePrices(prices);
+
+                const hidden = getHiddenStocks();
+                const idx = hidden.indexOf(code);
+                if (idx !== -1) {
+                    hidden.splice(idx, 1);
+                    saveHiddenStocks(hidden);
+                }
+
+                renderHistory();
+                showToast('已彻底删除');
+            });
+        }
+
+        // 恢复股票显示
+        function restoreStock(code) {
+            const hidden = getHiddenStocks();
+            const idx = hidden.indexOf(code);
+            if (idx !== -1) {
+                hidden.splice(idx, 1);
+                saveHiddenStocks(hidden);
+            }
+            renderHistory();
+            showToast('已恢复显示');
+        }
+
+        // ==================== Detail Modal ====================
+        function showStockDetail(code) {
+            const positions = calculatePositions();
+            const pos = positions[code];
+            const prices = getPrices();
+            const price = prices[code] || 0;
+
+            const trades = getTradesWithAverageCost(code);
+            const tradesHtml = trades.map(t => `
+                <div class="transaction-item">
+                    <div class="transaction-info">
+                        <div class="transaction-date">${formatDate(t.date)}</div>
+                        <div class="transaction-details">
+                            <span class="transaction-type ${t.type}">${t.type === 'buy' ? '买入' : '卖出'}</span>
+                            ${t.quantity}股 @ ¥${t.price.toFixed(2)}
+                        </div>
+                    </div>
+                    <div class="transaction-profit">
+                        ${t.type === 'sell' && t.profit !== undefined ? `
+                            <span class="${t.profit >= 0 ? 'profit' : 'loss'}">
+                                ${t.profit >= 0 ? '+' : ''}¥${formatNumber(t.profit)}
+                            </span>
+                        ` : '—'}
+                    </div>
+                    <button class="delete-btn" onclick="deleteTrade(${t.id})">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+
+            // 计算已实现盈亏
+            let realizedProfit = 0;
+            trades.reverse().forEach(t => {
+                if (t.type === 'sell' && t.profit !== undefined) {
+                    realizedProfit += t.profit;
+                }
+            });
+            trades.reverse();
+
+            const marketValue = price * (pos ? pos.totalQuantity : 0);
+            const totalCost = (pos ? pos.averageCost : 0) * (pos ? pos.totalQuantity : 0);
+            const profit = marketValue - totalCost;
+            const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
+
+            const hiddenStocks = getHiddenStocks();
+            const isHidden = hiddenStocks.includes(code);
+
+            const content = `
+                <div class="form-title">${pos ? pos.name : code} (${code})</div>
+                ${!pos || pos.totalQuantity === 0 ? '<span class="stock-badge" style="display: inline-block; margin-bottom: 16px;">已清仓</span>' : ''}
+                <div class="stock-info" style="margin-bottom: 16px;">
+                    <div class="stock-info-item">
+                        <span class="stock-info-label">持仓数量</span>
+                        <span class="stock-info-value">${pos ? formatNumber(pos.totalQuantity) : 0} 股</span>
+                    </div>
+                    <div class="stock-info-item">
+                        <span class="stock-info-label">平均成本</span>
+                        <span class="stock-info-value">¥${pos ? pos.averageCost.toFixed(2) : '0.00'}</span>
+                    </div>
+                    <div class="stock-info-item">
+                        <span class="stock-info-label">现价</span>
+                        <input type="number" class="price-input" value="${price}"
+                            onchange="updatePriceAndRefresh('${code}', this.value)">
+                    </div>
+                    <div class="stock-info-item">
+                        <span class="stock-info-label">市值</span>
+                        <span class="stock-info-value">¥${formatNumber(marketValue)}</span>
+                    </div>
+                    <div class="stock-info-item">
+                        <span class="stock-info-label">持仓盈亏</span>
+                        <span class="stock-info-value ${profit >= 0 ? 'profit' : 'loss'}">
+                            ¥${formatNumber(profit)} (${profitPercent >= 0 ? '+' : ''}${profitPercent.toFixed(2)}%)
+                        </span>
+                    </div>
+                    <div class="stock-info-item">
+                        <span class="stock-info-label">已实现盈亏</span>
+                        <span class="stock-info-value ${realizedProfit >= 0 ? 'profit' : 'loss'}">
+                            ¥${formatNumber(realizedProfit)}
+                        </span>
+                    </div>
+                </div>
+
+                ${isHidden && pos && pos.totalQuantity === 0 ? `
+                    <button class="header-btn" style="width: 100%; margin-bottom: 16px;" onclick="restoreStock('${code}'); closeDetailModal();">
+                        恢复显示
+                    </button>
+                ` : ''}
+
+                <div class="chart-container">
+                    <div class="chart-title">成本曲线</div>
+                    <select class="period-btn" style="margin-bottom: 12px; width: 100%;" onchange="renderChart('${code}', this.value)">
+                        <option value="all">全部</option>
+                        <option value="year">近一年</option>
+                        <option value="half">近半年</option>
+                        <option value="quarter">近三个月</option>
+                    </select>
+                    <canvas id="cost-chart" height="200"></canvas>
+                </div>
+
+                <div class="form-title">交易记录</div>
+                <div class="transaction-list">
+                    ${tradesHtml}
+                </div>
+
+                <button class="header-btn danger" style="width: 100%; margin-top: 16px;" onclick="deleteStockCompletely('${code}'); closeDetailModal();">
+                    彻底删除
+                </button>
+            `;
+
+            document.getElementById('detail-content').innerHTML = content;
+            document.getElementById('detail-modal').classList.add('active');
+
+            // 渲染图表
+            renderChart(code, 'all');
+        }
+
+        function updatePriceAndRefresh(code, price) {
+            updatePrice(code, price);
+            showStockDetail(code);
+        }
+
+        function closeDetailModal() {
+            document.getElementById('detail-modal').classList.remove('active');
+            renderPortfolio();
+        }
+
+        // ==================== Chart ====================
+        let currentChart = null;
+
+        function renderChart(code, period) {
+            const trades = getTrades().filter(t => t.code === code);
+            trades.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // 按时间段过滤
+            const now = new Date();
+            let startDate = new Date(0);
+
+            if (period === 'year') {
+                startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            } else if (period === 'half') {
+                startDate = new Date(now.getFullYear(), now.getMonth() - 6, now.getDate());
+            } else if (period === 'quarter') {
+                startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+            }
+
+            const filteredTrades = trades.filter(t => new Date(t.date) >= startDate);
+
+            // 计算成本历史
+            const labels = [];
+            const costData = [];
+            const quantityData = [];
+
+            let totalQuantity = 0;
+            let totalCost = 0;
+            let averageCost = 0;
+
+            filteredTrades.forEach(trade => {
+                if (trade.type === 'buy') {
+                    totalCost += trade.price * trade.quantity;
+                    totalQuantity += trade.quantity;
+                    averageCost = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+                } else {
+                    totalQuantity -= trade.quantity;
+                    totalCost = averageCost * totalQuantity;
+                    if (totalQuantity <= 0) {
+                        totalQuantity = 0;
+                        totalCost = 0;
+                        averageCost = 0;
+                    }
+                }
+
+                labels.push(trade.date);
+                costData.push(averageCost);
+                quantityData.push(totalQuantity);
+            });
+
+            // 销毁旧图表
+            if (currentChart) {
+                currentChart.destroy();
+            }
+
+            // 创建新图表
+            const ctx = document.getElementById('cost-chart').getContext('2d');
+            currentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '平均成本',
+                            data: costData,
+                            borderColor: '#FF3B30',
+                            backgroundColor: 'rgba(255, 59, 48, 0.1)',
+                            yAxisID: 'y',
+                            tension: 0.3,
+                            fill: false
+                        },
+                        {
+                            label: '持仓数量',
+                            data: quantityData,
+                            type: 'bar',
+                            backgroundColor: 'rgba(0, 122, 255, 0.5)',
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: '平均成本 (元)'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '持仓数量'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ==================== Report ====================
+        let currentReportPeriod = 'month';
+
+        function showReport() {
+            document.getElementById('report-modal').classList.add('active');
+            updateReport();
+        }
+
+        function closeReportModal() {
+            document.getElementById('report-modal').classList.remove('active');
+        }
+
+        function setReportPeriod(period) {
+            currentReportPeriod = period;
+            document.querySelectorAll('#report-modal .period-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            updateReport();
+        }
+
+        function updateReport() {
+            const trades = getTrades();
+            const now = new Date();
+            let startDate = new Date(0);
+
+            if (currentReportPeriod === 'today') {
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (currentReportPeriod === 'week') {
+                const weekday = now.getDay();
+                const daysToSubtract = weekday === 0 ? 6 : weekday - 1;
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToSubtract);
+            } else if (currentReportPeriod === 'month') {
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            }
+
+            const filteredTrades = trades.filter(t => new Date(t.date) >= startDate);
+
+            let buyAmount = 0;
+            let sellAmount = 0;
+            let buyCount = 0;
+            let sellCount = 0;
+            let realizedProfit = 0;
+
+            filteredTrades.forEach(trade => {
+                const amount = trade.price * trade.quantity;
+                if (trade.type === 'buy') {
+                    buyAmount += amount;
+                    buyCount++;
+                } else {
+                    sellAmount += amount;
+                    sellCount++;
+                }
+            });
+
+            // 计算已实现盈亏
+            const tradesByCode = {};
+            filteredTrades.forEach(t => {
+                if (!tradesByCode[t.code]) tradesByCode[t.code] = [];
+                tradesByCode[t.code].push(t);
+            });
+
+            Object.values(tradesByCode).forEach(codeTrades => {
+                codeTrades.sort((a, b) => new Date(a.date) - new Date(b.date));
+                let avgCost = 0;
+                let qty = 0;
+
+                codeTrades.forEach(t => {
+                    if (t.type === 'buy') {
+                        qty += t.quantity;
+                        avgCost = qty > 0 ? (avgCost * (qty - t.quantity) + t.price * t.quantity) / qty : 0;
+                    } else {
+                        realizedProfit += (t.price - avgCost) * t.quantity;
+                        qty -= t.quantity;
+                    }
+                });
+            });
+
+            const netInvestment = buyAmount - sellAmount;
+            const totalCount = buyCount + sellCount;
+
+            const html = `
+                <table class="report-table">
+                    <tr>
+                        <td>买入总额</td>
+                        <td>¥${formatNumber(buyAmount)}</td>
+                    </tr>
+                    <tr>
+                        <td>卖出总额</td>
+                        <td>¥${formatNumber(sellAmount)}</td>
+                    </tr>
+                    <tr>
+                        <td>净投入</td>
+                        <td>¥${formatNumber(netInvestment)}</td>
+                    </tr>
+                    <tr>
+                        <td>已实现盈亏</td>
+                        <td class="${realizedProfit >= 0 ? 'profit' : 'loss'}">¥${formatNumber(realizedProfit)}</td>
+                    </tr>
+                    <tr class="total-row">
+                        <td>交易次数</td>
+                        <td>${totalCount} 次 (买入${buyCount}次 / 卖出${sellCount}次)</td>
+                    </tr>
+                </table>
+            `;
+
+            document.getElementById('report-content').innerHTML = html;
+        }
+
+        // ==================== Import/Export ====================
+        function exportData() {
+            const data = {
+                stockTrades: getTrades(),
+                stockPrices: getPrices(),
+                hiddenStocks: getHiddenStocks(),
+                exportTime: new Date().toISOString()
+            };
+
+            const jsonStr = JSON.stringify(data, null, 2);
+
+            // 复制到剪贴板
+            navigator.clipboard.writeText(jsonStr).then(() => {
+                showToast('数据已复制到剪贴板');
+            }).catch(() => {
+                // 如果复制失败，下载文件
+                const blob = new Blob([jsonStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `stock-data-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('数据已下载');
+            });
+        }
+
+        function showImportModal() {
+            document.getElementById('import-modal').classList.add('active');
+        }
+
+        function closeImportModal() {
+            document.getElementById('import-modal').classList.remove('active');
+            document.getElementById('import-data').value = '';
+        }
+
+        function importData() {
+            const jsonStr = document.getElementById('import-data').value.trim();
+
+            if (!jsonStr) {
+                showToast('请输入数据');
+                return;
+            }
+
+            try {
+                const data = JSON.parse(jsonStr);
+
+                if (data.stockTrades) {
+                    saveTrades(data.stockTrades);
+                }
+                if (data.stockPrices) {
+                    savePrices(data.stockPrices);
+                }
+                if (data.hiddenStocks) {
+                    saveHiddenStocks(data.hiddenStocks);
+                }
+
+                closeImportModal();
+                closeReportModal();
+                renderPortfolio();
+                showToast('数据导入成功');
+
+            } catch (e) {
+                showToast('数据格式错误');
+            }
+        }
+
+        // ==================== Clear All Data ====================
+        function clearAllData() {
+            showConfirm('清空所有数据', '确定要清空所有数据吗？此操作不可恢复！', () => {
+                localStorage.removeItem(STORAGE_KEYS.trades);
+                localStorage.removeItem(STORAGE_KEYS.prices);
+                localStorage.removeItem(STORAGE_KEYS.hidden);
+                closeReportModal();
+                renderPortfolio();
+                showToast('所有数据已清空');
+            });
+        }
+
+        // ==================== Confirm Modal ====================
+        let confirmCallback = null;
+
+        function showConfirm(title, message, callback) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            confirmCallback = callback;
+            document.getElementById('confirm-modal').classList.add('active');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.remove('active');
+            confirmCallback = null;
+        }
+
+        function confirmAction() {
+            if (confirmCallback) {
+                confirmCallback();
+            }
+            closeConfirmModal();
+        }
+
+        // ==================== Toast ====================
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.remove('show');
+            void toast.offsetWidth; // 触发重绘
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // ==================== Utility Functions ====================
+        function formatNumber(num) {
+            return num.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('zh-CN');
+        }
+    </script>
+</body>
+</html>
