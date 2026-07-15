@@ -205,6 +205,7 @@
             color: var(--text-primary);
             font-size: 14px;
             text-align: right;
+            max-width: 100%;
         }
 
         /* Form Styles */
@@ -236,6 +237,9 @@
             color: var(--text-primary);
             font-size: 16px;
             min-height: 44px;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .form-group input:focus,
@@ -520,7 +524,7 @@
                 </div>
                 <div class="form-group">
                     <label>交易日期</label>
-                    <input type="date" id="trade-date" required>
+                    <input type="date" id="trade-date" required style="width: 100%;">
                 </div>
                 <button type="submit" class="submit-btn">添加交易</button>
             </form>
@@ -529,6 +533,7 @@
 
     <!-- History Tab -->
     <div id="tab-history" class="container">
+        <h1 style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">历史记录</h1>
         <div id="history-list"></div>
         <div id="history-empty" class="empty-state" style="display: none;">
             <div class="empty-state-icon">📁</div>
@@ -664,6 +669,9 @@
             if (tab === 'portfolio') {
                 document.getElementById('page-title').textContent = 'Duck Stock';
             }
+            if (tab === 'history') {
+                document.getElementById('page-title').textContent = '历史记录';
+            }
         }
 
         // ==================== Position Calculation ====================
@@ -782,7 +790,7 @@
                 </div>
             `;
 
-            // 持仓列表
+            // 持仓列表 - 按新顺序：平均成本 → 持仓数量 → 总成本 → 现价 → 市值 → 持仓盈亏
             const listHtml = activeStocks.map(pos => {
                 const price = prices[pos.code] || 0;
                 const totalCostSingle = pos.averageCost * pos.totalQuantity;
@@ -800,10 +808,6 @@
                         </div>
                         <div class="stock-info">
                             <div class="stock-info-item">
-                                <span class="stock-info-label">总成本</span>
-                                <span class="stock-info-value">$${formatNumber(totalCostSingle)}</span>
-                            </div>
-                            <div class="stock-info-item">
                                 <span class="stock-info-label">平均成本</span>
                                 <span class="stock-info-value">$${pos.averageCost.toFixed(2)}</span>
                             </div>
@@ -812,11 +816,15 @@
                                 <span class="stock-info-value">${formatNumber(pos.totalQuantity)} 股</span>
                             </div>
                             <div class="stock-info-item">
+                                <span class="stock-info-label">总成本</span>
+                                <span class="stock-info-value">$${formatNumber(totalCostSingle)}</span>
+                            </div>
+                            <div class="stock-info-item">
                                 <span class="stock-info-label">现价 ($)</span>
                                 <input type="number" class="price-input" value="${price}"
                                     onchange="updatePrice('${pos.code}', this.value)"
                                     onclick="event.stopPropagation()"
-                                    placeholder="0.00">
+                                    placeholder="$0.00">
                             </div>
                             <div class="stock-info-item">
                                 <span class="stock-info-label">市值</span>
@@ -1028,35 +1036,45 @@
                 }
             });
 
-            const tradesHtml = trades.map(t => `
-                <div class="transaction-item">
-                    <div class="transaction-info">
-                        <div class="transaction-date">${formatDate(t.date)}</div>
-                        <div class="transaction-details">
-                            <span class="transaction-type ${t.type}">${t.type === 'buy' ? '买入' : '卖出'}</span>
-                            ${t.quantity}股 @ $${t.price.toFixed(2)}
+            // 交易记录列表 - 每笔交易显示盈亏（买入+$0，卖出显示实际盈亏）
+            const tradesHtml = trades.map(t => {
+                let profitDisplay = '';
+                if (t.type === 'buy') {
+                    profitDisplay = '<span class="profit">+$0</span>';
+                } else if (t.type === 'sell' && t.profit !== undefined) {
+                    const sign = t.profit >= 0 ? '+' : '';
+                    profitDisplay = `<span class="${t.profit >= 0 ? 'profit' : 'loss'}">$${sign}${formatNumber(t.profit)}</span>`;
+                } else {
+                    profitDisplay = '<span style="color: var(--text-secondary);">—</span>';
+                }
+
+                return `
+                    <div class="transaction-item">
+                        <div class="transaction-info">
+                            <div class="transaction-date">${formatDate(t.date)}</div>
+                            <div class="transaction-details">
+                                <span class="transaction-type ${t.type}">${t.type === 'buy' ? '买入' : '卖出'}</span>
+                                ${t.quantity}股 @ $${t.price.toFixed(2)}
+                            </div>
                         </div>
+                        <div class="transaction-profit">
+                            ${profitDisplay}
+                        </div>
+                        <button class="delete-btn" onclick="deleteTrade(${t.id}); showStockDetail('${code}');">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                            </svg>
+                        </button>
                     </div>
-                    <div class="transaction-profit">
-                        ${t.type === 'sell' && t.profit !== undefined ? `
-                            <span class="${t.profit >= 0 ? 'profit' : 'loss'}">
-                                ${t.profit >= 0 ? '+' : ''}$${formatNumber(t.profit)}
-                            </span>
-                        ` : '<span style="color: var(--text-secondary);">—</span>'}
-                    </div>
-                    <button class="delete-btn" onclick="deleteTrade(${t.id}); showStockDetail('${code}');">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                        </svg>
-                    </button>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             const marketValue = price * (pos ? pos.totalQuantity : 0);
             const totalCost = (pos ? pos.averageCost : 0) * (pos ? pos.totalQuantity : 0);
             const profit = marketValue - totalCost;
             const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
 
+            // 按新顺序：平均成本 → 持仓数量 → 总成本 → 现价 → 市值 → 持仓盈亏
             const content = `
                 <div class="form-title">${pos ? pos.name : code} (${code})</div>
                 ${!pos || pos.totalQuantity === 0 ? '<span class="stock-badge" style="display:inline-block;margin-bottom:16px;">已清仓</span>' : ''}
@@ -1072,17 +1090,22 @@
 
                 <div class="stock-info" style="margin-bottom: 16px;">
                     <div class="stock-info-item">
-                        <span class="stock-info-label">持仓数量</span>
-                        <span class="stock-info-value">${pos ? formatNumber(pos.totalQuantity) : 0} 股</span>
-                    </div>
-                    <div class="stock-info-item">
                         <span class="stock-info-label">平均成本</span>
                         <span class="stock-info-value">$${pos ? pos.averageCost.toFixed(2) : '0.00'}</span>
                     </div>
                     <div class="stock-info-item">
+                        <span class="stock-info-label">持仓数量</span>
+                        <span class="stock-info-value">${pos ? formatNumber(pos.totalQuantity) : 0} 股</span>
+                    </div>
+                    <div class="stock-info-item">
+                        <span class="stock-info-label">总成本</span>
+                        <span class="stock-info-value">$${formatNumber(totalCost)}</span>
+                    </div>
+                    <div class="stock-info-item">
                         <span class="stock-info-label">现价 ($)</span>
                         <input type="number" class="price-input" value="${price}"
-                            onchange="updatePrice('${code}', this.value); showStockDetail('${code}');">
+                            onchange="updatePrice('${code}', this.value); showStockDetail('${code}');"
+                            placeholder="$0.00" style="width: 100%;">
                     </div>
                     <div class="stock-info-item">
                         <span class="stock-info-label">市值</span>
@@ -1102,6 +1125,11 @@
                     </button>
                 ` : ''}
 
+                <div class="form-title">交易记录</div>
+                <div class="transaction-list" style="margin-bottom: 16px;">
+                    ${tradesHtml}
+                </div>
+
                 <div class="chart-container">
                     <div class="chart-title">成本曲线</div>
                     <select class="period-btn" style="width:100%;margin-bottom:12px;" onchange="renderChart('${code}', this.value)">
@@ -1113,11 +1141,6 @@
                     <div style="height: 250px;">
                         <canvas id="cost-chart"></canvas>
                     </div>
-                </div>
-
-                <div class="form-title">交易记录</div>
-                <div class="transaction-list" style="margin-bottom: 16px;">
-                    ${tradesHtml}
                 </div>
 
                 <button class="action-btn danger" style="width:100%;" onclick="deleteStockCompletely('${code}'); closeDetailModal();">
