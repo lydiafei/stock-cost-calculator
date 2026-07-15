@@ -1107,7 +1107,7 @@
                     const isProfit = t.profit >= 0;
                     const sign = isProfit ? '+' : '-';
                     const absProfit = Math.abs(t.profit);
-                    profitDisplay = '<span class="' + (isProfit ? 'profit' : 'loss') + '">$' + sign + formatNumber(absProfit) + '</span>';
+                    profitDisplay = '<span class="' + (isProfit ? 'profit' : 'loss') + '">' + sign + '$' + formatNumber(absProfit) + '</span>';
                 } else {
                     profitDisplay = '<span style="color: var(--text-secondary);">—</span>';
                 }
