@@ -248,6 +248,37 @@
             border-color: var(--primary-color);
         }
 
+        /* 日期输入框特殊处理 - 防止Safari自动格式化导致溢出 */
+        .date-input {
+            width: 100%;
+            max-width: 180px !important;
+            min-width: 140px !important;
+            padding: 10px 8px !important;
+            font-size: 14px !important;
+            text-align: center;
+            letter-spacing: 0;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 8px !important;
+            background: var(--card-bg) !important;
+            color: var(--text-primary) !important;
+            box-sizing: border-box;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .date-input:focus {
+            outline: none;
+            border-color: var(--primary-color) !important;
+        }
+
+        /* 移除日期输入框的默认图标（Safari） */
+        .date-input::-webkit-calendar-picker-indicator {
+            opacity: 0.6;
+            width: 16px;
+            height: 16px;
+            margin-left: 4px;
+        }
+
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -524,7 +555,7 @@
                 </div>
                 <div class="form-group">
                     <label>交易日期</label>
-                    <input type="date" id="trade-date" required style="width: 100%;">
+                    <input type="date" id="trade-date" required class="date-input">
                 </div>
                 <button type="submit" class="submit-btn">添加交易</button>
             </form>
