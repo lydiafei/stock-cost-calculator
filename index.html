@@ -759,16 +759,23 @@
                 const pos = positions[code];
 
                 if (trade.type === 'buy') {
+                    // 买入：增加总成本和持仓数量，重新计算平均成本
                     pos.totalCost += trade.price * trade.quantity;
                     pos.totalQuantity += trade.quantity;
                     pos.averageCost = pos.totalQuantity > 0 ? pos.totalCost / pos.totalQuantity : 0;
                 } else {
+                    // 卖出：计算盈亏，扣减持仓数量和总成本，重新计算平均成本
                     const profit = (trade.price - pos.averageCost) * trade.quantity;
                     pos.realizedProfit += profit;
                     pos.totalQuantity -= trade.quantity;
-                    pos.totalCost = pos.averageCost * pos.totalQuantity;
 
-                    if (pos.totalQuantity <= 0) {
+                    if (pos.totalQuantity > 0) {
+                        // 剩余持仓按当前平均成本计算总成本
+                        pos.totalCost = pos.averageCost * pos.totalQuantity;
+                        // 重新计算平均成本（反映卖出后的成本变化）
+                        pos.averageCost = pos.totalCost / pos.totalQuantity;
+                    } else {
+                        // 清仓
                         pos.totalQuantity = 0;
                         pos.totalCost = 0;
                         pos.averageCost = 0;
@@ -791,14 +798,22 @@
                 const result = { ...trade, averageCost: averageCost };
 
                 if (trade.type === 'buy') {
+                    // 买入：增加总成本和持仓数量，重新计算平均成本
                     totalCost += trade.price * trade.quantity;
                     totalQuantity += trade.quantity;
                     averageCost = totalQuantity > 0 ? totalCost / totalQuantity : 0;
                 } else {
+                    // 卖出：计算盈亏，扣减持仓数量和总成本，重新计算平均成本
                     result.profit = (trade.price - averageCost) * trade.quantity;
                     totalQuantity -= trade.quantity;
-                    totalCost = averageCost * totalQuantity;
-                    if (totalQuantity <= 0) averageCost = 0;
+                    if (totalQuantity > 0) {
+                        totalCost = averageCost * totalQuantity;
+                        // 重新计算平均成本
+                        averageCost = totalCost / totalQuantity;
+                    } else {
+                        totalCost = 0;
+                        averageCost = 0;
+                    }
                 }
 
                 return result;
