@@ -248,22 +248,21 @@
             border-color: var(--primary-color);
         }
 
-        /* 日期输入框特殊处理 - 防止Safari自动格式化导致溢出 */
+        /* 日期输入框样式 - 与其他输入框完全一致 */
         .date-input {
-            width: 100%;
-            max-width: 180px !important;
-            min-width: 140px !important;
-            padding: 10px 8px !important;
-            font-size: 14px !important;
-            text-align: center;
-            letter-spacing: 0;
+            width: 100% !important;
+            padding: 12px !important;
             border: 1px solid var(--border-color) !important;
             border-radius: 8px !important;
             background: var(--card-bg) !important;
             color: var(--text-primary) !important;
+            font-size: 16px !important;
+            min-height: 44px !important;
+            max-width: 100% !important;
             box-sizing: border-box;
             overflow: hidden;
             text-overflow: ellipsis;
+            text-align: left;
         }
 
         .date-input:focus {
@@ -271,12 +270,24 @@
             border-color: var(--primary-color) !important;
         }
 
-        /* 移除日期输入框的默认图标（Safari） */
+        /* 隐藏Safari日期选择器图标，释放内部空间 */
         .date-input::-webkit-calendar-picker-indicator {
-            opacity: 0.6;
-            width: 16px;
-            height: 16px;
-            margin-left: 4px;
+            opacity: 0 !important;
+            width: 0 !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        /* 强制日期输入框内部值占满宽度 */
+        .date-input::-webkit-date-and-time-value {
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            text-align: left !important;
         }
 
         .form-row {
@@ -1073,8 +1084,10 @@
                 if (t.type === 'buy') {
                     profitDisplay = '<span class="profit">+$0</span>';
                 } else if (t.type === 'sell' && t.profit !== undefined) {
-                    const sign = t.profit >= 0 ? '+' : '';
-                    profitDisplay = `<span class="${t.profit >= 0 ? 'profit' : 'loss'}">$${sign}${formatNumber(t.profit)}</span>`;
+                    const isProfit = t.profit >= 0;
+                    const sign = isProfit ? '+' : '-';
+                    const absProfit = Math.abs(t.profit);
+                    profitDisplay = `<span class="${isProfit ? 'profit' : 'loss'}">$${sign}${formatNumber(absProfit)}</span>`;
                 } else {
                     profitDisplay = '<span style="color: var(--text-secondary);">—</span>';
                 }
