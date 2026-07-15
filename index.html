@@ -846,7 +846,7 @@
                     <div class="summary-row">
                         <span class="summary-label">持仓盈亏</span>
                         <span class="summary-value ${totalProfit >= 0 ? 'profit' : 'loss'}">
-                            $${formatNumber(totalProfit)} (${totalProfitPercent >= 0 ? '+' : ''}${totalProfitPercent.toFixed(2)}%)
+                            ${totalProfit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(totalProfit))} (${totalProfitPercent >= 0 ? '+' : ''}${totalProfitPercent.toFixed(2)}%)
                         </span>
                     </div>
                 </div>
@@ -895,7 +895,7 @@
                             <div class="stock-info-item">
                                 <span class="stock-info-label">持仓盈亏</span>
                                 <span class="stock-info-value ${profit >= 0 ? 'profit' : 'loss'}">
-                                    $${formatNumber(profit)} (${profitPercent >= 0 ? '+' : ''}${profitPercent.toFixed(2)}%)
+                                    ${profit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(profit))} (${profitPercent >= 0 ? '+' : ''}${profitPercent.toFixed(2)}%)
                                 </span>
                             </div>
                         </div>
@@ -931,7 +931,7 @@
                             <div class="stock-info-item">
                                 <span class="stock-info-label">已实现盈亏</span>
                                 <span class="stock-info-value ${pos.realizedProfit >= 0 ? 'profit' : 'loss'}">
-                                    $${formatNumber(pos.realizedProfit)}
+                                    ${pos.realizedProfit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(pos.realizedProfit))}
                                 </span>
                             </div>
                         </div>
@@ -1147,7 +1147,7 @@
                     <div class="summary-row">
                         <span class="summary-label">累计已实现盈亏</span>
                         <span class="summary-value ${realizedProfit >= 0 ? 'profit' : 'loss'}">
-                            $${formatNumber(realizedProfit)}
+                            ${realizedProfit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(realizedProfit))}
                         </span>
                     </div>
                 </div>
@@ -1178,7 +1178,7 @@
                     <div class="stock-info-item">
                         <span class="stock-info-label">持仓盈亏</span>
                         <span class="stock-info-value ${profit >= 0 ? 'profit' : 'loss'}">
-                            $${formatNumber(profit)} (${profitPercent >= 0 ? '+' : ''}${profitPercent.toFixed(2)}%)
+                            ${profit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(profit))} (${profitPercent >= 0 ? '+' : ''}${profitPercent.toFixed(2)}%)
                         </span>
                     </div>
                 </div>
