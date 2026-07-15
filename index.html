@@ -737,81 +737,111 @@
         }
 
         // ==================== Position Calculation ====================
+        // 按用户要求的算法：卖出时从总成本中扣除的是"卖出收入"（卖出价格×数量），而非原持仓成本
         function calculatePositions() {
             const trades = getTrades();
             const positions = {};
 
+            // 按时间正序排序
             trades.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // 初始化每只股票的累计变量
+            const stockState = {};
 
             trades.forEach(trade => {
                 const code = trade.code;
+                if (!stockState[code]) {
+                    stockState[code] = {
+                        name: trade.name,
+                        totalCost: 0,
+                        totalQty: 0,
+                        avgCost: 0,
+                        realizedProfit: 0
+                    };
+                }
+
+                const s = stockState[code];
+
+                if (trade.type === 'buy') {
+                    // 买入：totalCost = totalCost + (成交价格 × 成交数量)
+                    s.totalCost = s.totalCost + (trade.price * trade.quantity);
+                    // totalQty = totalQty + 成交数量
+                    s.totalQty = s.totalQty + trade.quantity;
+                    // avgCost = totalCost / totalQty
+                    s.avgCost = s.totalQty > 0 ? s.totalCost / s.totalQty : 0;
+                } else {
+                    // 卖出：卖出前平均成本
+                    const costBeforeSell = s.avgCost;
+                    // 该笔卖出盈亏 = (成交价格 - 卖出前平均成本) × 成交数量
+                    const profit = (trade.price - costBeforeSell) * trade.quantity;
+                    s.realizedProfit = s.realizedProfit + profit;
+                    // 总成本减去卖出收入（卖出价格 × 卖出数量）
+                    s.totalCost = s.totalCost - (trade.price * trade.quantity);
+                    // totalQty = totalQty - 成交数量
+                    s.totalQuantity = s.totalQty = s.totalQty - trade.quantity;
+                    // 重新计算平均成本
+                    if (s.totalQty > 0) {
+                        s.avgCost = s.totalCost / s.totalQty;
+                    } else {
+                        s.avgCost = 0;
+                        s.totalCost = 0;
+                    }
+                }
+
+                // 同步到 positions 对象（用于渲染显示）
                 if (!positions[code]) {
                     positions[code] = {
                         code: code,
-                        name: trade.name,
+                        name: s.name,
                         totalQuantity: 0,
                         totalCost: 0,
                         averageCost: 0,
                         realizedProfit: 0
                     };
                 }
-
-                const pos = positions[code];
-
-                if (trade.type === 'buy') {
-                    // 买入：增加总成本和持仓数量，重新计算平均成本
-                    pos.totalCost += trade.price * trade.quantity;
-                    pos.totalQuantity += trade.quantity;
-                    pos.averageCost = pos.totalQuantity > 0 ? pos.totalCost / pos.totalQuantity : 0;
-                } else {
-                    // 卖出：计算盈亏，扣减持仓数量和总成本，重新计算平均成本
-                    const profit = (trade.price - pos.averageCost) * trade.quantity;
-                    pos.realizedProfit += profit;
-                    pos.totalQuantity -= trade.quantity;
-
-                    if (pos.totalQuantity > 0) {
-                        // 扣减卖出部分的成本后，重新计算平均成本
-                        pos.totalCost -= pos.averageCost * trade.quantity;
-                        pos.averageCost = pos.totalCost / pos.totalQuantity;
-                    } else {
-                        // 清仓
-                        pos.totalQuantity = 0;
-                        pos.totalCost = 0;
-                        pos.averageCost = 0;
-                    }
-                }
+                positions[code].totalQuantity = s.totalQty;
+                positions[code].totalCost = s.totalQty > 0 ? s.avgCost * s.totalQty : 0;
+                positions[code].averageCost = s.avgCost;
+                positions[code].realizedProfit = s.realizedProfit;
             });
 
             return positions;
         }
 
+        // 每笔交易后立即重新计算，卖出价格参与（按用户要求的算法）
         function getTradesWithAverageCost(stockCode) {
             const trades = getTrades().filter(t => t.code === stockCode);
             trades.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-            let totalQuantity = 0;
             let totalCost = 0;
-            let averageCost = 0;
+            let totalQty = 0;
+            let avgCost = 0;
 
             return trades.map(trade => {
-                const result = { ...trade, averageCost: averageCost };
+                const result = { ...trade, averageCost: avgCost };
 
                 if (trade.type === 'buy') {
-                    // 买入：增加总成本和持仓数量，重新计算平均成本
-                    totalCost += trade.price * trade.quantity;
-                    totalQuantity += trade.quantity;
-                    averageCost = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+                    // 买入：totalCost = totalCost + (成交价格 × 成交数量)
+                    totalCost = totalCost + (trade.price * trade.quantity);
+                    // totalQty = totalQty + 成交数量
+                    totalQty = totalQty + trade.quantity;
+                    // avgCost = totalCost / totalQty
+                    avgCost = totalQty > 0 ? totalCost / totalQty : 0;
                 } else {
-                    // 卖出：计算盈亏，扣减持仓数量和总成本，重新计算平均成本
-                    result.profit = (trade.price - averageCost) * trade.quantity;
-                    totalQuantity -= trade.quantity;
-                    if (totalQuantity > 0) {
-                        // 扣减卖出部分的成本后，重新计算平均成本
-                        totalCost -= averageCost * trade.quantity;
-                        averageCost = totalCost / totalQuantity;
+                    // 卖出前平均成本
+                    const costBeforeSell = avgCost;
+                    // 该笔卖出盈亏 = (成交价格 - 卖出前平均成本) × 成交数量
+                    result.profit = (trade.price - costBeforeSell) * trade.quantity;
+                    // 总成本减去卖出收入（卖出价格 × 卖出数量）
+                    totalCost = totalCost - (trade.price * trade.quantity);
+                    // totalQty = totalQty - 成交数量
+                    totalQty = totalQty - trade.quantity;
+                    // 重新计算平均成本
+                    if (totalQty > 0) {
+                        avgCost = totalCost / totalQty;
                     } else {
+                        avgCost = 0;
                         totalCost = 0;
-                        averageCost = 0;
                     }
                 }
 
@@ -1255,31 +1285,36 @@
             const costData = [];
             const quantityData = [];
 
-            let totalQuantity = 0;
             let totalCost = 0;
-            let averageCost = 0;
+            let totalQty = 0;
+            let avgCost = 0;
 
             filteredTrades.forEach(trade => {
                 if (trade.type === 'buy') {
-                    totalCost += trade.price * trade.quantity;
-                    totalQuantity += trade.quantity;
-                    averageCost = totalQuantity > 0 ? totalCost / totalQuantity : 0;
+                    // 买入：totalCost = totalCost + (成交价格 × 成交数量)
+                    totalCost = totalCost + (trade.price * trade.quantity);
+                    // totalQty = totalQty + 成交数量
+                    totalQty = totalQty + trade.quantity;
+                    // avgCost = totalCost / totalQty
+                    avgCost = totalQty > 0 ? totalCost / totalQty : 0;
                 } else {
-                    totalQuantity -= trade.quantity;
-                    if (totalQuantity > 0) {
-                        // 扣减卖出部分的成本后，重新计算平均成本
-                        totalCost -= averageCost * trade.quantity;
-                        averageCost = totalCost / totalQuantity;
-                    } else if (totalQuantity <= 0) {
-                        totalQuantity = 0;
+                    // 该笔卖出盈亏 = (成交价格 - 卖出前平均成本) × 成交数量（用于图表显示）
+                    // 总成本减去卖出收入（卖出价格 × 卖出数量）
+                    totalCost = totalCost - (trade.price * trade.quantity);
+                    // totalQty = totalQty - 成交数量
+                    totalQty = totalQty - trade.quantity;
+                    // 重新计算平均成本
+                    if (totalQty > 0) {
+                        avgCost = totalCost / totalQty;
+                    } else {
+                        avgCost = 0;
                         totalCost = 0;
-                        averageCost = 0;
                     }
                 }
 
                 labels.push(trade.date);
-                costData.push(averageCost);
-                quantityData.push(totalQuantity);
+                costData.push(avgCost);
+                quantityData.push(totalQty);
             });
 
             if (currentChart) {
