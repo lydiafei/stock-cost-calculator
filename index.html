@@ -770,9 +770,8 @@
                     pos.totalQuantity -= trade.quantity;
 
                     if (pos.totalQuantity > 0) {
-                        // 剩余持仓按当前平均成本计算总成本
-                        pos.totalCost = pos.averageCost * pos.totalQuantity;
-                        // 重新计算平均成本（反映卖出后的成本变化）
+                        // 扣减卖出部分的成本后，重新计算平均成本
+                        pos.totalCost -= pos.averageCost * trade.quantity;
                         pos.averageCost = pos.totalCost / pos.totalQuantity;
                     } else {
                         // 清仓
@@ -807,8 +806,8 @@
                     result.profit = (trade.price - averageCost) * trade.quantity;
                     totalQuantity -= trade.quantity;
                     if (totalQuantity > 0) {
-                        totalCost = averageCost * totalQuantity;
-                        // 重新计算平均成本
+                        // 扣减卖出部分的成本后，重新计算平均成本
+                        totalCost -= averageCost * trade.quantity;
                         averageCost = totalCost / totalQuantity;
                     } else {
                         totalCost = 0;
@@ -1267,8 +1266,11 @@
                     averageCost = totalQuantity > 0 ? totalCost / totalQuantity : 0;
                 } else {
                     totalQuantity -= trade.quantity;
-                    totalCost = averageCost * totalQuantity;
-                    if (totalQuantity <= 0) {
+                    if (totalQuantity > 0) {
+                        // 扣减卖出部分的成本后，重新计算平均成本
+                        totalCost -= averageCost * trade.quantity;
+                        averageCost = totalCost / totalQuantity;
+                    } else if (totalQuantity <= 0) {
                         totalQuantity = 0;
                         totalCost = 0;
                         averageCost = 0;
