@@ -1,12 +1,15 @@
 <!DOCTYPE html>
-<!-- V7版本：2026-10-15 更新
-     核心修改：新增「交易周期」分离
-     1. 每只股票可存在多个独立交易周期；持仓数量为0时若新增一笔买入，即视为开启新周期
-     2. 新周期从第一笔买入起独立计算平均成本、持仓数量、持仓盈亏、已实现盈亏，旧周期数据不参与
-     3. 已清仓且多周期的股票显示「清仓盈亏」+「累计清仓盈亏」（所有历史周期盈亏之和）
-     4. 顶部汇总「总清仓盈亏」= 所有已清仓周期盈亏之和（含重新买入后其旧周期仍计入）
-     5. 交易记录列表标注所属周期（第N周期）
-     其余功能（平均成本算法、表单顺序、智能填充、日期框样式、图表、历史记录、导入导出）保持不变
+<!-- V8版本：2026-10-15 更新
+     核心修改：「持仓周期」独立记录，替代 V7 的「交易周期」方案
+     1. 每个持仓周期为一条独立记录，按买入日期区分；持仓数量为0时新增一笔买入即开启新周期
+     2. 新周期仅使用本周期内交易数据计算平均成本、持仓数量、持仓盈亏、已实现盈亏，绝不与旧周期混算
+     3. 持仓页（未清仓股票）仅使用当前周期交易数据，不再使用 CycleID 字段
+     4. 历史页（已清仓股票）每个持仓周期显示为独立记录，标注「持仓日期：YYYY-MM-DD 至 YYYY-MM-DD」，
+        点击记录仅展示该周期内的交易明细
+     5. 每个已清仓周期显示「清仓盈亏」；每只股票显示「累计清仓盈亏」（所有已清仓周期盈亏之和）；
+        主页顶部显示「总清仓盈亏」（含重新买入后其旧周期仍计入）
+     6. 新增交易时不使用 CycleID 字段；持仓数据按时间顺序遍历当前周期交易计算（移动加权平均算法不变）
+     其余功能（平均成本算法、表单顺序、智能填充、日期框样式、图表、导入导出）保持不变
 -->
 <html lang="zh-CN">
 <head>
@@ -1038,6 +1041,7 @@
         }
 
         // ==================== Render History ====================
+        // V8：每个「持仓周期」为一条独立记录，按持仓日期区分；点击仅展示该周期交易明细
         function renderHistory() {
             const positions = calculatePositions();
             const hiddenStocks = getHiddenStocks();
@@ -1046,43 +1050,59 @@
             const historyStocks = Object.values(positions).filter(pos => pos.totalQuantity === 0);
 
             const listHtml = historyStocks.map(pos => {
+                const cycles = computeStockCycles(pos.code);
+                // 该股票所有已清仓周期（持仓=0，正常即为全部周期）
+                const closedCycles = cycles.filter(c => c.totalQty === 0);
                 const isHidden = hiddenStocks.includes(pos.code);
 
-                return `
-                    <div class="stock-card" onclick="showStockDetail('${pos.code}')">
-                        <div class="stock-header">
-                            <span>
-                                <span class="stock-name">${pos.name}</span>
-                                <span class="stock-code">${pos.code}</span>
-                            </span>
-                            <span class="stock-badge">已清仓</span>
-                        </div>
-                        <div class="stock-info">
-                            <div class="stock-info-item">
-                                <!-- V7: 已清仓股票，字段为「清仓盈亏」（当前/最近一个周期的已实现盈亏） -->
-                                <span class="stock-info-label">清仓盈亏</span>
-                                <span class="stock-info-value ${pos.realizedProfit >= 0 ? 'profit' : 'loss'}">
-                                    ${pos.realizedProfit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(pos.realizedProfit))}
+                return closedCycles.map(cycle => {
+                    const cycleNo = cycles.indexOf(cycle) + 1;
+                    const isLastCycle = cycle === cycles[cycles.length - 1];
+                    // 持仓日期：该周期第一笔交易日期 至 该周期最后一笔交易日期
+                    const startDate = cycle.trades[0].date;
+                    const endDate = cycle.trades[cycle.trades.length - 1].date;
+
+                    return `
+                        <div class="stock-card" onclick="showStockDetail('${pos.code}', ${cycleNo})">
+                            <div class="stock-header">
+                                <span>
+                                    <span class="stock-name">${pos.name}</span>
+                                    <span class="stock-code">${pos.code}</span>
                                 </span>
+                                <span class="stock-badge">第${cycleNo}周期 · 已清仓</span>
                             </div>
-                            ${pos.cycleCount >= 2 ? `
+                            <div class="stock-info">
                                 <div class="stock-info-item">
-                                    <!-- V7: 多个周期已清仓时显示「累计清仓盈亏」（所有历史周期盈亏之和） -->
-                                    <span class="stock-info-label">累计清仓盈亏</span>
-                                    <span class="stock-info-value ${pos.allRealized >= 0 ? 'profit' : 'loss'}">
-                                        ${pos.allRealized >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(pos.allRealized))}
+                                    <!-- V8: 每个持仓周期独立显示持仓日期范围 -->
+                                    <span class="stock-info-label">持仓日期</span>
+                                    <span class="stock-info-value">${startDate} 至 ${endDate}</span>
+                                </div>
+                                <div class="stock-info-item">
+                                    <!-- V8: 每个已清仓周期独立显示「清仓盈亏」 -->
+                                    <span class="stock-info-label">清仓盈亏</span>
+                                    <span class="stock-info-value ${cycle.realized >= 0 ? 'profit' : 'loss'}">
+                                        ${cycle.realized >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(cycle.realized))}
                                     </span>
+                                </div>
+                                ${isLastCycle && pos.cycleCount >= 2 ? `
+                                    <div class="stock-info-item">
+                                        <!-- V8: 该股票最后一个周期卡片显示「累计清仓盈亏」（所有已清仓周期盈亏之和） -->
+                                        <span class="stock-info-label">累计清仓盈亏</span>
+                                        <span class="stock-info-value ${pos.allRealized >= 0 ? 'profit' : 'loss'}">
+                                            ${pos.allRealized >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(pos.allRealized))}
+                                        </span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            ${isHidden ? `
+                                <div class="action-btns" style="margin-top: 12px;">
+                                    <button class="action-btn" onclick="event.stopPropagation(); restoreStock('${pos.code}')">恢复显示</button>
+                                    <button class="action-btn danger" onclick="event.stopPropagation(); deleteStockCompletely('${pos.code}')">彻底删除</button>
                                 </div>
                             ` : ''}
                         </div>
-                        ${isHidden ? `
-                            <div class="action-btns" style="margin-top: 12px;">
-                                <button class="action-btn" onclick="event.stopPropagation(); restoreStock('${pos.code}')">恢复显示</button>
-                                <button class="action-btn danger" onclick="event.stopPropagation(); deleteStockCompletely('${pos.code}')">彻底删除</button>
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
+                    `;
+                }).join('');
             }).join('');
 
             document.getElementById('history-list').innerHTML = listHtml;
@@ -1221,7 +1241,9 @@
         // ==================== Stock Detail ====================
         let currentChart = null;
 
-        function showStockDetail(code) {
+        // V8: 支持按「持仓周期」查看——showStockDetail(code) 默认查看当前周期；
+        //     showStockDetail(code, cycleNo) 查看指定周期（历史页每周期一张卡片调用）
+        function showStockDetail(code, cycleNo) {
             const positions = calculatePositions();
             const pos = positions[code];
             const prices = getPrices();
@@ -1229,12 +1251,21 @@
             const hiddenStocks = getHiddenStocks();
             const isHidden = hiddenStocks.includes(code);
 
-            const trades = getTradesWithAverageCost(code);
+            // V8: 按持仓周期切分交易；cycleNo 指定查看的周期，未指定/越界时回退到当前周期（最后一个）
+            const cycles = computeStockCycles(code);
+            if (!cycleNo || cycleNo < 1 || cycleNo > cycles.length) {
+                cycleNo = cycles.length;
+            }
+            const targetCycle = cycles[cycleNo - 1] || null;
+            // V8: 仅展示所选周期的交易明细（倒序，与 V7 展示顺序一致）
+            const trades = targetCycle ? targetCycle.trades.slice().reverse() : [];
+            const isClearedCycle = targetCycle ? targetCycle.totalQty === 0 : true;
+            const isLastCycle = cycleNo === cycles.length;
 
-            // V7: 已实现盈亏 = 当前（最近）周期的已实现盈亏（旧周期盈亏不参与当前计算）
-            const realizedProfit = pos ? pos.realizedProfit : 0;
-            // V7: 累计清仓盈亏 = 该股票所有历史周期盈亏之和（仅多周期已清仓时展示）
-            const allCycleRealized = pos ? pos.allRealized : 0;
+            // V8: 该周期清仓盈亏（当前持仓周期则为已实现盈亏）
+            const realizedProfit = targetCycle ? targetCycle.realized : 0;
+            // V8: 累计清仓盈亏 = 该股票所有已清仓周期盈亏之和（仅多周期时展示）
+            const allCycleRealized = pos ? pos.closedRealized : 0;
 
             // 交易记录列表 - 每笔交易显示盈亏（买入+$0.00，卖出显示实际盈亏）
             const tradesHtml = trades.map(t => {
@@ -1257,14 +1288,14 @@
                             <div class="transaction-details">
                                 <span class="transaction-type ${t.type}">${t.type === 'buy' ? '买入' : '卖出'}</span>
                                 ${t.quantity}股 @ $${t.price.toFixed(2)}
-                                <!-- V7: 标注所属周期，并显示该笔交易完成后的移动加权平均成本 -->
-                                <span style="display:block;margin-top:2px;color:var(--text-secondary);">第${t.cycleIndex}周期 · 平均成本 $${(t.averageCost || 0).toFixed(2)}</span>
+                                <!-- V8: 仅显示所选周期；平均成本为所选周期内该笔交易完成后的移动加权平均成本 -->
+                                <span style="display:block;margin-top:2px;color:var(--text-secondary);">第${cycleNo}周期 · 平均成本 $${(t.averageCost || 0).toFixed(2)}</span>
                             </div>
                         </div>
                         <div class="transaction-profit">
                             ${profitDisplay}
                         </div>
-                        <button class="delete-btn" onclick="deleteTrade(${t.id}); showStockDetail('${code}');">
+                        <button class="delete-btn" onclick="deleteTrade(${t.id}); showStockDetail('${code}', ${cycleNo});">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                             </svg>
@@ -1280,19 +1311,19 @@
 
             const content = `
                 <div class="form-title">${pos ? pos.name : code} (${code})</div>
-                ${!pos || pos.totalQuantity === 0 ? '<span class="stock-badge" style="display:inline-block;margin-bottom:16px;">已清仓</span>' : ''}
+                ${!pos || isClearedCycle ? '<span class="stock-badge" style="display:inline-block;margin-bottom:16px;">已清仓</span>' : ''}
 
                 <div class="summary-card" style="margin-bottom: 16px;">
                     <div class="summary-row">
-                        <!-- V7: 已清仓股票显示「清仓盈亏」，未清仓股票显示「累计已实现盈亏」 -->
-                        <span class="summary-label">${pos && pos.totalQuantity === 0 ? '清仓盈亏' : '累计已实现盈亏'}</span>
+                        <!-- V8: 所选周期已清仓时显示「清仓盈亏」，当前持仓周期显示「累计已实现盈亏」 -->
+                        <span class="summary-label">${isClearedCycle ? '清仓盈亏' : '累计已实现盈亏'}</span>
                         <span class="summary-value ${realizedProfit >= 0 ? 'profit' : 'loss'}">
                             ${realizedProfit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(realizedProfit))}
                         </span>
                     </div>
-                    ${pos && pos.totalQuantity === 0 && pos.cycleCount >= 2 ? `
+                    ${isClearedCycle && pos && pos.cycleCount >= 2 ? `
                         <div class="summary-row">
-                            <!-- V7: 多周期已清仓时显示「累计清仓盈亏」 -->
+                            <!-- V8: 该股票存在多个持仓周期时显示「累计清仓盈亏」 -->
                             <span class="summary-label">累计清仓盈亏</span>
                             <span class="summary-value ${allCycleRealized >= 0 ? 'profit' : 'loss'}">
                                 ${allCycleRealized >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(allCycleRealized))}
@@ -1317,7 +1348,7 @@
                     <div class="stock-info-item">
                         <span class="stock-info-label">现价 ($)</span>
                         <input type="number" class="price-input" value="${price}"
-                            onchange="updatePrice('${code}', this.value); showStockDetail('${code}');"
+                            onchange="updatePrice('${code}', this.value); showStockDetail('${code}', ${cycleNo});"
                             placeholder="$0.00" style="width: 100%;">
                     </div>
                     <div class="stock-info-item">
@@ -1345,7 +1376,7 @@
 
                 <div class="chart-container">
                     <div class="chart-title">成本曲线</div>
-                    <select class="period-btn" style="width:100%;margin-bottom:12px;" onchange="renderChart('${code}', this.value)">
+                    <select class="period-btn" style="width:100%;margin-bottom:12px;" onchange="renderChart('${code}', this.value, ${cycleNo})">
                         <option value="month">近一个月</option>
                         <option value="quarter">近三个月</option>
                         <option value="half">近半年</option>
@@ -1364,7 +1395,7 @@
             document.getElementById('detail-content').innerHTML = content;
             document.getElementById('detail-modal').classList.add('active');
 
-            renderChart(code, 'month');
+            renderChart(code, 'month', cycleNo);
         }
 
         function closeDetailModal() {
@@ -1373,8 +1404,14 @@
         }
 
         // ==================== Chart ====================
-        function renderChart(code, period) {
-            const trades = getTrades().filter(t => t.code === code);
+        function renderChart(code, period, cycleNo) {
+            // V8: 仅使用所选持仓周期的交易数据绘图（默认当前周期）
+            const cycles = computeStockCycles(code);
+            if (!cycleNo || cycleNo < 1 || cycleNo > cycles.length) {
+                cycleNo = cycles.length;
+            }
+            const targetCycle = cycles[cycleNo - 1] || null;
+            const trades = targetCycle ? targetCycle.trades.slice() : [];
             trades.sort((a, b) => new Date(a.date) - new Date(b.date));
 
             const now = new Date();
