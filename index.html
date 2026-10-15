@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<!-- V5版本：2025-07-15 更新
-     1. 添加交易表单智能填充逻辑（已有代码时名称字段变为只读）
-     2. 表单字段顺序调整（股票代码在前、成交数量在前）
-     3. 保持平均成本计算逻辑不变（V3/V4已正确实现）
-     4. 保持持仓页面顶部指标、个股卡片字段、个股弹窗文字不变
+<!-- V6版本：2026-10-15 更新
+     1. 应用名称从"Duck Stock"改为"Lucky Ducky"
+     2. 个股详情弹窗交易记录列表增加"平均成本"列（显示每笔交易完成后的移动加权平均成本）
+     3. 已清仓股票（持仓数量为0）的"已实现盈亏"字段改名为"清仓盈亏"（未清仓保持"累计已实现盈亏"不变）
+     4. 顶部汇总指标"累计已实现盈亏"改名为"总清仓盈亏"，仅统计所有已清仓股票的清仓盈亏之和
+     其余功能（平均成本算法、表单顺序、智能填充、日期框样式、图表、历史记录、导入导出）保持不变
 -->
 <html lang="zh-CN">
 <head>
@@ -11,8 +12,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Duck Stock">
-    <title>Duck Stock</title>
+    <meta name="apple-mobile-web-app-title" content="Lucky Ducky">
+    <title>Lucky Ducky</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -549,7 +550,7 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <h1 id="page-title">Duck Stock</h1>
+        <h1 id="page-title">Lucky Ducky</h1>
         <div style="display: flex; gap: 8px;">
             <button class="header-btn" onclick="showImportExport()">数据</button>
         </div>
@@ -688,11 +689,12 @@
     <div id="toast" class="toast"></div>
 
     <script>
-        // ==================== V5版本 ====================
+        // ==================== V6版本 ====================
         // 更新内容：
-        // 1. 添加交易表单智能填充逻辑（已有代码时名称字段变为只读）
-        // 2. 表单字段顺序调整（股票代码在前、成交数量在前）
-        // 3. 保持平均成本计算逻辑不变
+        // 1. 应用名称从"Duck Stock"改为"Lucky Ducky"
+        // 2. 个股详情弹窗交易记录列表增加"平均成本"列
+        // 3. 已清仓股票的"已实现盈亏"字段改名为"清仓盈亏"
+        // 4. 顶部汇总指标改名为"总清仓盈亏"，仅统计已清仓股票的清仓盈亏
 
         // ==================== Storage Keys ====================
         const KEYS = {
@@ -790,7 +792,7 @@
             }
 
             if (tab === 'portfolio') {
-                document.getElementById('page-title').textContent = 'Duck Stock';
+                document.getElementById('page-title').textContent = 'Lucky Ducky';
             }
             if (tab === 'history') {
                 document.getElementById('page-title').textContent = '历史记录';
@@ -879,7 +881,7 @@
             let avgCost = 0;
 
             return trades.map(trade => {
-                const result = { ...trade, averageCost: avgCost };
+                const result = { ...trade };
 
                 if (trade.type === 'buy') {
                     // 买入：totalCost = totalCost + (成交价格 × 成交数量)
@@ -905,6 +907,9 @@
                         totalCost = 0;
                     }
                 }
+
+                // V6: 记录每笔交易完成后的移动加权平均成本（对应交易记录列表的「平均成本」列）
+                result.averageCost = avgCost;
 
                 return result;
             }).reverse();
@@ -937,9 +942,12 @@
                 totalProfit += marketValue - cost;
             });
 
-            // 遍历所有股票（含已清仓）计算累计已实现盈亏
+            // V6: 遍历所有已清仓股票（持仓数量为0）计算总清仓盈亏
+            // 未清仓股票的已实现盈亏不计入"总清仓盈亏"
             Object.values(positions).forEach(pos => {
-                totalRealizedProfit += pos.realizedProfit;
+                if (pos.totalQuantity === 0) {
+                    totalRealizedProfit += pos.realizedProfit;
+                }
             });
 
             const totalProfitPercent = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0;
@@ -962,7 +970,7 @@
                         </span>
                     </div>
                     <div class="summary-row">
-                        <span class="summary-label">累计已实现盈亏</span>
+                        <span class="summary-label">总清仓盈亏</span>
                         <span class="summary-value ${totalRealizedProfit >= 0 ? 'profit' : 'loss'}">
                             ${totalRealizedProfit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(totalRealizedProfit))}
                         </span>
@@ -1053,7 +1061,8 @@
                         </div>
                         <div class="stock-info">
                             <div class="stock-info-item">
-                                <span class="stock-info-label">已实现盈亏</span>
+                                <!-- V6: 已清仓股票，字段改名为「清仓盈亏」 -->
+                                <span class="stock-info-label">清仓盈亏</span>
                                 <span class="stock-info-value ${pos.realizedProfit >= 0 ? 'profit' : 'loss'}">
                                     ${pos.realizedProfit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(pos.realizedProfit))}
                                 </span>
@@ -1244,6 +1253,8 @@
                             <div class="transaction-details">
                                 <span class="transaction-type ${t.type}">${t.type === 'buy' ? '买入' : '卖出'}</span>
                                 ${t.quantity}股 @ $${t.price.toFixed(2)}
+                                <!-- V6: 该笔交易完成后的移动加权平均成本 -->
+                                <span style="display:block;margin-top:2px;color:var(--text-secondary);">平均成本 $${(t.averageCost || 0).toFixed(2)}</span>
                             </div>
                         </div>
                         <div class="transaction-profit">
@@ -1269,7 +1280,8 @@
 
                 <div class="summary-card" style="margin-bottom: 16px;">
                     <div class="summary-row">
-                        <span class="summary-label">累计已实现盈亏</span>
+                        <!-- V6: 已清仓股票显示「清仓盈亏」，未清仓股票显示「累计已实现盈亏」 -->
+                        <span class="summary-label">${pos && pos.totalQuantity === 0 ? '清仓盈亏' : '累计已实现盈亏'}</span>
                         <span class="summary-value ${realizedProfit >= 0 ? 'profit' : 'loss'}">
                             ${realizedProfit >= 0 ? '+$' : '-$'}${formatNumber(Math.abs(realizedProfit))}
                         </span>
